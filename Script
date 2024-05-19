@@ -1,0 +1,287 @@
+SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0;
+SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0;
+SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION';
+
+-- -----------------------------------------------------
+-- Schema pokemon
+-- -----------------------------------------------------
+CREATE SCHEMA IF NOT EXISTS `pokemon` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci ;
+USE `pokemon` ;
+
+-- -----------------------------------------------------
+-- Table `pokemon`.`tipo`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `pokemon`.`tipo` (
+  `IDTipo` TINYINT UNSIGNED NOT NULL,
+  `TipoNombre` CHAR(12) NOT NULL,
+  PRIMARY KEY (`IDTipo`),
+  UNIQUE INDEX `TipoNombre` (`TipoNombre` ASC) VISIBLE)
+ENGINE = InnoDB
+DEFAULT CHARACTER SET = utf8mb4
+COLLATE = utf8mb4_0900_ai_ci;
+
+-- -----------------------------------------------------
+-- Table `pokemon`.`categoria`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `pokemon`.`categoria` (
+  `IDcat` TINYINT UNSIGNED NOT NULL,
+  `Categoria` CHAR(8) NOT NULL,
+  PRIMARY KEY (`IDcat`),
+  UNIQUE INDEX `Categoria` (`Categoria` ASC) VISIBLE)
+ENGINE = InnoDB
+DEFAULT CHARACTER SET = utf8mb4
+COLLATE = utf8mb4_0900_ai_ci;
+
+-- -----------------------------------------------------
+-- Table `pokemon`.`movimientos`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `pokemon`.`movimientos` (
+  `IDMovimiento` SMALLINT UNSIGNED NOT NULL,
+  `MovimientoNombre` CHAR(16) NOT NULL,
+  `Poder` TINYINT UNSIGNED NOT NULL,
+  `Punteria` TINYINT UNSIGNED NOT NULL,
+  `PP` TINYINT UNSIGNED NOT NULL,
+  `Efecto` VARCHAR(255) NOT NULL,
+  `IDTipo` TINYINT UNSIGNED NOT NULL,
+  `IDcat` TINYINT UNSIGNED NOT NULL,
+  PRIMARY KEY (`IDMovimiento`),
+  UNIQUE INDEX `MovimientoNombre` (`MovimientoNombre` ASC) VISIBLE,
+  INDEX `fk_movimientos_tipo1_idx` (`IDTipo` ASC) VISIBLE,
+  INDEX `fk_movimientos_categoria1_idx` (`IDcat` ASC) VISIBLE,
+  CONSTRAINT `fk_movimientos_tipo1`
+    FOREIGN KEY (`IDTipo`)
+    REFERENCES `pokemon`.`tipo` (`IDTipo`)
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION,
+  CONSTRAINT `fk_movimientos_categoria1`
+    FOREIGN KEY (`IDcat`)
+    REFERENCES `pokemon`.`categoria` (`IDcat`)
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION)
+ENGINE = InnoDB
+DEFAULT CHARACTER SET = utf8mb4
+COLLATE = utf8mb4_0900_ai_ci;
+
+-- -----------------------------------------------------
+-- Table `pokemon`.`pokemon`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `pokemon`.`pokemon` (
+  `IDpoke` SMALLINT UNSIGNED NOT NULL,
+  `NombrePokemon` CHAR(12) NOT NULL,
+  `HP` TINYINT UNSIGNED NOT NULL,
+  `Ataque` TINYINT UNSIGNED NOT NULL,
+  `Defensa` TINYINT UNSIGNED NOT NULL,
+  `spAtaque` TINYINT UNSIGNED NOT NULL,
+  `spDefensa` TINYINT UNSIGNED NOT NULL,
+  `Velocidad` TINYINT UNSIGNED NOT NULL,
+  PRIMARY KEY (`IDpoke`),
+  UNIQUE INDEX `NombrePokemon` (`NombrePokemon` ASC) VISIBLE)
+ENGINE = InnoDB
+DEFAULT CHARACTER SET = utf8mb4
+COLLATE = utf8mb4_0900_ai_ci;
+
+-- -----------------------------------------------------
+-- Table `pokemon`.`aprendizajes`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `pokemon`.`aprendizajes` (
+  `IDpoke` SMALLINT UNSIGNED NOT NULL,
+  `IDMovimiento` SMALLINT UNSIGNED NOT NULL,
+  `Nivel` TINYINT UNSIGNED NOT NULL,
+  PRIMARY KEY (`IDpoke`, `IDMovimiento`),
+  INDEX `fk_learnset_Movimiento` (`IDMovimiento` ASC) VISIBLE,
+  CONSTRAINT `fk_learnset_Movimiento`
+    FOREIGN KEY (`IDMovimiento`)
+    REFERENCES `pokemon`.`movimientos` (`IDMovimiento`)
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION,
+  CONSTRAINT `fk_learnset_poke`
+    FOREIGN KEY (`IDpoke`)
+    REFERENCES `pokemon`.`pokemon` (`IDpoke`)
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION)
+ENGINE = InnoDB
+DEFAULT CHARACTER SET = utf8mb4
+COLLATE = utf8mb4_0900_ai_ci;
+
+-- -----------------------------------------------------
+-- Table `pokemon`.`egggroup`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `pokemon`.`egggroup` (
+  `IDegg` TINYINT UNSIGNED NOT NULL,
+  `eggNombre` CHAR(12) NOT NULL,
+  PRIMARY KEY (`IDegg`),
+  UNIQUE INDEX `eggNombre` (`eggNombre` ASC) VISIBLE)
+ENGINE = InnoDB
+DEFAULT CHARACTER SET = utf8mb4
+COLLATE = utf8mb4_0900_ai_ci;
+
+-- -----------------------------------------------------
+-- Table `pokemon`.`habilidad`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `pokemon`.`habilidad` (
+  `IDHabilidad` TINYINT UNSIGNED NOT NULL,
+  `HabilidadNombre` CHAR(14) NOT NULL,
+  `HabilidadDescrip` VARCHAR(255) NOT NULL,
+  PRIMARY KEY (`IDHabilidad`),
+  UNIQUE INDEX `HabilidadNombre` (`HabilidadNombre` ASC) VISIBLE)
+ENGINE = InnoDB
+DEFAULT CHARACTER SET = utf8mb4
+COLLATE = utf8mb4_0900_ai_ci;
+
+-- -----------------------------------------------------
+-- Table `pokemon`.`poke-egg`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `pokemon`.`poke-egg` (
+  `IDpoke` SMALLINT UNSIGNED NOT NULL,
+  `IDegg` TINYINT UNSIGNED NOT NULL,
+  PRIMARY KEY (`IDpoke`, `IDegg`),
+  INDEX `fk_pokeegg_egg` (`IDegg` ASC) VISIBLE,
+  CONSTRAINT `fk_pokeegg_egg`
+    FOREIGN KEY (`IDegg`)
+    REFERENCES `pokemon`.`egggroup` (`IDegg`)
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION,
+  CONSTRAINT `fk_pokeegg_poke`
+    FOREIGN KEY (`IDpoke`)
+    REFERENCES `pokemon`.`pokemon` (`IDpoke`)
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION)
+ENGINE = InnoDB
+DEFAULT CHARACTER SET = utf8mb4
+COLLATE = utf8mb4_0900_ai_ci;
+
+-- -----------------------------------------------------
+-- Table `pokemon`.`poke-habilidad`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `pokemon`.`poke-habilidad` (
+  `IDpoke` SMALLINT UNSIGNED NOT NULL,
+  `IDHabilidad` TINYINT UNSIGNED NOT NULL,
+  `slot` CHAR(1) NOT NULL,
+  PRIMARY KEY (`IDpoke`, `IDHabilidad`),
+  INDEX `fk_pokeabi_abi` (`IDHabilidad` ASC) VISIBLE,
+  CONSTRAINT `fk_pokeabi_abi`
+    FOREIGN KEY (`IDHabilidad`)
+    REFERENCES `pokemon`.`habilidad` (`IDHabilidad`)
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION,
+  CONSTRAINT `fk_pokeabi_poke`
+    FOREIGN KEY (`IDpoke`)
+    REFERENCES `pokemon`.`pokemon` (`IDpoke`)
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION)
+ENGINE = InnoDB
+DEFAULT CHARACTER SET = utf8mb4
+COLLATE = utf8mb4_0900_ai_ci;
+
+-- -----------------------------------------------------
+-- Table `pokemon`.`poke-tipo`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `pokemon`.`poke-tipo` (
+  `IDpoke` SMALLINT UNSIGNED NOT NULL,
+  `IDTipo` TINYINT UNSIGNED NOT NULL,
+  PRIMARY KEY (`IDpoke`, `IDTipo`),
+  INDEX `fk_poketipo_tipo` (`IDTipo` ASC) VISIBLE,
+  CONSTRAINT `fk_poketipo_tipo`
+    FOREIGN KEY (`IDTipo`)
+    REFERENCES `pokemon`.`tipo` (`IDTipo`)
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION,
+  CONSTRAINT `fk_poketipo_poke`
+    FOREIGN KEY (`IDpoke`)
+    REFERENCES `pokemon`.`pokemon` (`IDpoke`)
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION)
+ENGINE = InnoDB
+DEFAULT CHARACTER SET = utf8mb4
+COLLATE = utf8mb4_0900_ai_ci;
+
+-- -----------------------------------------------------
+-- Table `pokemon`.`videojuegos`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `pokemon`.`videojuegos` (
+  `IDJuego` TINYINT UNSIGNED NOT NULL,
+  `NombreJuego` VARCHAR(20) NOT NULL,
+  PRIMARY KEY (`IDJuego`),
+  UNIQUE INDEX `NombreJuego` (`NombreJuego` ASC) VISIBLE)
+ENGINE = InnoDB
+DEFAULT CHARACTER SET = utf8mb4
+COLLATE = utf8mb4_0900_ai_ci;
+
+-- -----------------------------------------------------
+-- Table `pokemon`.`poke_videojuegos`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `pokemon`.`poke_videojuegos` (
+  `IDpoke` SMALLINT UNSIGNED NOT NULL,
+  `IDJuego` TINYINT UNSIGNED NOT NULL,
+  PRIMARY KEY (`IDpoke`, `IDJuego`),
+  INDEX `fk_poke_juego_juego` (`IDJuego` ASC) VISIBLE,
+  CONSTRAINT `fk_poke_juego_juego`
+    FOREIGN KEY (`IDJuego`)
+    REFERENCES `pokemon`.`videojuegos` (`IDJuego`)
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION,
+  CONSTRAINT `fk_poke_juego_poke`
+    FOREIGN KEY (`IDpoke`)
+    REFERENCES `pokemon`.`pokemon` (`IDpoke`)
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION)
+ENGINE = InnoDB
+DEFAULT CHARACTER SET = utf8mb4
+COLLATE = utf8mb4_0900_ai_ci;
+
+-- -----------------------------------------------------
+-- Table `pokemon`.`tiporelaciones`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `pokemon`.`tiporelaciones` (
+  `IDTipoFuente` TINYINT UNSIGNED NOT NULL,
+  `IDTipoObjetivo` TINYINT UNSIGNED NOT NULL,
+  `Relación` ENUM('Debil', 'Fuerte') NOT NULL,
+  PRIMARY KEY (`IDTipoFuente`, `IDTipoObjetivo`),
+  INDEX `fk_relaciones_tipoObjetivo` (`IDTipoObjetivo` ASC) VISIBLE,
+  CONSTRAINT `fk_relaciones_tipoFuente`
+    FOREIGN KEY (`IDTipoFuente`)
+    REFERENCES `pokemon`.`tipo` (`IDTipo`)
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION,
+  CONSTRAINT `fk_relaciones_tipoObjetivo`
+    FOREIGN KEY (`IDTipoObjetivo`)
+    REFERENCES `pokemon`.`tipo` (`IDTipo`)
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION)
+ENGINE = InnoDB
+DEFAULT CHARACTER SET = utf8mb4
+COLLATE = utf8mb4_0900_ai_ci;
+
+-- Eliminar la función base_stat_total si ya existe
+DROP FUNCTION IF EXISTS `base_stat_total`;
+
+DELIMITER $$
+CREATE DEFINER=`root`@`localhost` FUNCTION `base_stat_total`(pokeno SMALLINT UNSIGNED) RETURNS smallint
+    READS SQL DATA
+BEGIN
+    DECLARE bst SMALLINT;
+    SELECT HP + Ataque + Defensa + spAtaque + spDefensa + Velocidad INTO bst
+    FROM `pokemon`
+    WHERE IDpoke = pokeno;
+    RETURN bst;
+END$$
+DELIMITER ;
+
+-- Eliminar la función stat_average si ya existe
+DROP FUNCTION IF EXISTS `stat_average`;
+
+DELIMITER $$
+CREATE DEFINER=`root`@`localhost` FUNCTION `stat_average`(pokeno SMALLINT UNSIGNED) RETURNS decimal(6,2)
+    READS SQL DATA
+BEGIN
+    DECLARE statavg decimal(6,2);
+    SELECT (HP + Ataque + Defensa + spAtaque + spDefensa + Velocidad) / 6.0 INTO statavg
+    FROM `pokemon`
+    WHERE IDpoke = pokeno;
+    RETURN statavg;
+END$$
+DELIMITER ;
+
+SET SQL_MODE=@OLD_SQL_MODE;
+SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS;
+SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS;
