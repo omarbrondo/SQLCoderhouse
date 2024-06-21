@@ -36,14 +36,14 @@ COLLATE = utf8mb4_0900_ai_ci;
 -- Table `pokemon`.`movimientos`
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `pokemon`.`movimientos` (
-  `IDMovimiento` SMALLINT UNSIGNED NOT NULL,
+  `IDMovimiento` int UNSIGNED NOT NULL,
   `MovimientoNombre` CHAR(16) NOT NULL,
+  `IDTipo` TINYINT UNSIGNED NOT NULL,
+  `IDcat` TINYINT UNSIGNED NOT NULL,
   `Poder` TINYINT UNSIGNED NOT NULL,
   `Punteria` TINYINT UNSIGNED NOT NULL,
   `PP` TINYINT UNSIGNED NOT NULL,
   `Efecto` VARCHAR(255) NOT NULL,
-  `IDTipo` TINYINT UNSIGNED NOT NULL,
-  `IDcat` TINYINT UNSIGNED NOT NULL,
   PRIMARY KEY (`IDMovimiento`),
   UNIQUE INDEX `MovimientoNombre` (`MovimientoNombre` ASC) VISIBLE,
   INDEX `fk_movimientos_tipo1_idx` (`IDTipo` ASC) VISIBLE,
@@ -85,7 +85,7 @@ COLLATE = utf8mb4_0900_ai_ci;
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `pokemon`.`aprendizajes` (
   `IDpoke` SMALLINT UNSIGNED NOT NULL,
-  `IDMovimiento` SMALLINT UNSIGNED NOT NULL,
+  `IDMovimiento` INT UNSIGNED NOT NULL,
   `Nivel` TINYINT UNSIGNED NOT NULL,
   PRIMARY KEY (`IDpoke`, `IDMovimiento`),
   INDEX `fk_learnset_Movimiento` (`IDMovimiento` ASC) VISIBLE,
@@ -120,7 +120,7 @@ COLLATE = utf8mb4_0900_ai_ci;
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `pokemon`.`habilidad` (
   `IDHabilidad` TINYINT UNSIGNED NOT NULL,
-  `HabilidadNombre` CHAR(14) NOT NULL,
+  `HabilidadNombre` CHAR(50) NOT NULL,
   `HabilidadDescrip` VARCHAR(255) NOT NULL,
   PRIMARY KEY (`IDHabilidad`),
   UNIQUE INDEX `HabilidadNombre` (`HabilidadNombre` ASC) VISIBLE)
@@ -149,6 +149,8 @@ CREATE TABLE IF NOT EXISTS `pokemon`.`poke-egg` (
 ENGINE = InnoDB
 DEFAULT CHARACTER SET = utf8mb4
 COLLATE = utf8mb4_0900_ai_ci;
+
+
 
 -- -----------------------------------------------------
 -- Table `pokemon`.`poke-habilidad`
@@ -199,7 +201,7 @@ COLLATE = utf8mb4_0900_ai_ci;
 -- Table `pokemon`.`videojuegos`
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `pokemon`.`videojuegos` (
-  `IDJuego` TINYINT UNSIGNED NOT NULL,
+  `IDJuego` TINYINT UNSIGNED AUTO_INCREMENT,
   `NombreJuego` VARCHAR(20) NOT NULL,
   PRIMARY KEY (`IDJuego`),
   UNIQUE INDEX `NombreJuego` (`NombreJuego` ASC) VISIBLE)
@@ -252,35 +254,374 @@ ENGINE = InnoDB
 DEFAULT CHARACTER SET = utf8mb4
 COLLATE = utf8mb4_0900_ai_ci;
 
--- Eliminar la función base_stat_total si ya existe
-DROP FUNCTION IF EXISTS `base_stat_total`;
 
-DELIMITER $$
-CREATE DEFINER=`root`@`localhost` FUNCTION `base_stat_total`(pokeno SMALLINT UNSIGNED) RETURNS smallint
-    READS SQL DATA
+
+-- *****************************************************VISTAS****************************************************
+CREATE VIEW Vista_Pokemon_Tipo AS
+SELECT p.IDpoke, p.NombrePokemon, t.TipoNombre
+FROM pokemon p
+JOIN `poke-tipo` pt ON p.IDpoke = pt.IDpoke
+JOIN tipo t ON pt.IDTipo = t.IDTipo;
+
+CREATE VIEW Vista_Pokemon_Habilidad AS
+SELECT p.IDpoke, p.NombrePokemon, h.HabilidadNombre
+FROM pokemon p
+JOIN `poke-habilidad` ph ON p.IDpoke = ph.IDpoke
+JOIN habilidad h ON ph.IDHabilidad = h.IDHabilidad;
+
+-- ***************************************************Funciones********************************************************
+-- Función: Calcular_Daño
+DELIMITER //
+
+CREATE FUNCTION Calcular_Daño(IDAtacante INT, IDDefensor INT, IDMovimiento INT) RETURNS FLOAT
+DETERMINISTIC
 BEGIN
-    DECLARE bst SMALLINT;
-    SELECT HP + Ataque + Defensa + spAtaque + spDefensa + Velocidad INTO bst
-    FROM `pokemon`
-    WHERE IDpoke = pokeno;
-    RETURN bst;
-END$$
+    DECLARE Ataque INT;
+    DECLARE Defensa INT;
+    DECLARE Poder INT;
+    DECLARE Daño FLOAT;
+
+    SELECT p.Ataque INTO Ataque FROM pokemon p WHERE p.IDpoke = IDAtacante;
+    SELECT p.Defensa INTO Defensa FROM pokemon p WHERE p.IDpoke = IDDefensor;
+    SELECT m.Poder INTO Poder FROM movimientos m WHERE m.IDMovimiento = IDMovimiento;
+
+    SET Daño = (Ataque / Defensa) * Poder;
+
+    RETURN Daño;
+END //
+
 DELIMITER ;
 
--- Eliminar la función stat_average si ya existe
-DROP FUNCTION IF EXISTS `stat_average`;
+-- Función: Obtener_Habilidades_Pokemon
+DELIMITER //
 
-DELIMITER $$
-CREATE DEFINER=`root`@`localhost` FUNCTION `stat_average`(pokeno SMALLINT UNSIGNED) RETURNS decimal(6,2)
-    READS SQL DATA
+CREATE FUNCTION Obtener_Habilidades_Pokemon(IDpoke INT) RETURNS VARCHAR(255)
+DETERMINISTIC
 BEGIN
-    DECLARE statavg decimal(6,2);
-    SELECT (HP + Ataque + Defensa + spAtaque + spDefensa + Velocidad) / 6.0 INTO statavg
-    FROM `pokemon`
-    WHERE IDpoke = pokeno;
-    RETURN statavg;
-END$$
+    DECLARE habilidades VARCHAR(255);
+
+    SELECT GROUP_CONCAT(h.HabilidadNombre SEPARATOR ', ') INTO habilidades
+    FROM habilidad h
+    JOIN pokemon_habilidad ph ON h.IDHabilidad = ph.IDHabilidad
+    WHERE ph.IDpoke = IDpoke;
+
+    RETURN habilidades;
+END //
+
 DELIMITER ;
+
+-- **************************************STORED PROCEDURES ******************************************************
+-- Stored Procedure: Insertar_Pokemon
+
+DELIMITER //
+
+CREATE PROCEDURE Insertar_Pokemon (
+    IN NombrePokemon VARCHAR(50),
+    IN HP INT,
+    IN Ataque INT,
+    IN Defensa INT,
+    IN spAtaque INT,
+    IN spDefensa INT,
+    IN Velocidad INT
+)
+BEGIN
+    INSERT INTO pokemon (NombrePokemon, HP, Ataque, Defensa, spAtaque, spDefensa, Velocidad)
+    VALUES (NombrePokemon, HP, Ataque, Defensa, spAtaque, spDefensa, Velocidad);
+END //
+
+DELIMITER ;
+
+-- Stored Procedure: Actualizar_Habilidad_Pokemon
+DELIMITER //
+
+CREATE PROCEDURE Actualizar_Habilidad_Pokemon (
+    IN IDpoke INT,
+    IN IDHabilidad INT
+)
+BEGIN
+    UPDATE pokemon_habilidad
+    SET IDHabilidad = IDHabilidad
+    WHERE IDpoke = IDpoke;
+END //
+
+DELIMITER ;
+
+-- ******************************************** TRIGGERS  *****************************************************
+-- Trigger: Trigger_Actualizar_Estadisticas
+DELIMITER //
+
+CREATE TRIGGER Trigger_Actualizar_Estadisticas
+AFTER UPDATE ON `poke-tipo`
+FOR EACH ROW
+BEGIN
+    IF NEW.IDTipo = 9 THEN -- Supongamos que el tipo "Acero" tiene ID 9
+        UPDATE pokemon
+        SET Defensa = Defensa + 10
+        WHERE IDpoke = NEW.IDpoke;
+    END IF;
+END //
+
+DELIMITER ;
+
+-- Trigger: Trigger_Borrar_Habilidades_Pokemon
+DELIMITER //
+
+CREATE TRIGGER Trigger_Borrar_Habilidades_Pokemon
+BEFORE DELETE ON pokemon
+FOR EACH ROW
+BEGIN
+    DELETE FROM `poke-habilidad`
+    WHERE IDpoke = OLD.IDpoke;
+END //
+
+DELIMITER ;
+
+
+-- Trigger: Trigger_Actualizar_Poder
+DELIMITER //
+
+CREATE TRIGGER Trigger_Actualizar_Poder
+AFTER UPDATE ON movimientos
+FOR EACH ROW
+BEGIN
+    IF NEW.IDTipo = 10 THEN -- Supongamos que el tipo "Fuego" tiene ID 10
+        UPDATE movimientos
+        SET Poder = Poder + 20
+        WHERE IDMovimiento = NEW.IDMovimiento;
+    END IF;
+END //
+
+DELIMITER ;
+
+-- ******************************** INSERCION DE ARCHIVOS ****************************************************
+
+INSERT INTO `pokemon` VALUES (3, 'Venusaur', 80, 82, 83, 100, 100, 80);
+INSERT INTO `pokemon` VALUES (6, 'Charizard', 78, 84, 78, 109, 85, 100);
+INSERT INTO `pokemon` VALUES (9, 'Blastoise', 79, 83, 100, 85, 105, 78);
+INSERT INTO `pokemon` VALUES (1, 'Raticate', 79, 83, 100, 85, 105, 78);
+INSERT INTO `pokemon` VALUES (10, 'Pidgeotto', 79, 83, 100, 85, 105, 78);
+INSERT INTO `pokemon` VALUES (11, 'Metapod', 79, 83, 100, 85, 105, 78);
+INSERT INTO `pokemon` VALUES (14, 'Charmeleon', 79, 83, 100, 85, 105, 78);
+INSERT INTO `pokemon` VALUES (25, 'Weedle', 79, 83, 100, 85, 105, 78);
+INSERT INTO `pokemon` VALUES (56, 'Kakuna', 79, 83, 100, 85, 105, 78);
+
+
+INSERT INTO `tipo` VALUES (1, 'Normal');
+INSERT INTO `tipo` VALUES (2, 'Lucha');
+INSERT INTO `tipo` VALUES (3, 'Volador');
+INSERT INTO `tipo` VALUES (4, 'Veneno');
+INSERT INTO `tipo` VALUES (5, 'Tierra');
+INSERT INTO `tipo` VALUES (6, 'Roca');
+INSERT INTO `tipo` VALUES (7, 'Bicho');
+INSERT INTO `tipo` VALUES (8, 'Fantasma');
+INSERT INTO `tipo` VALUES (9, 'Acero');
+INSERT INTO `tipo` VALUES (10, 'Fuego');
+INSERT INTO `tipo` VALUES (11, 'Agua');
+INSERT INTO `tipo` VALUES (12, 'Planta');
+INSERT INTO `tipo` VALUES (13, 'Electrico');
+INSERT INTO `tipo` VALUES (14, 'Psyquico');
+INSERT INTO `tipo` VALUES (15, 'Hielo');
+INSERT INTO `tipo` VALUES (16, 'Dragon');
+INSERT INTO `tipo` VALUES (17, 'Oscuro');
+INSERT INTO `tipo` VALUES (18, 'Hada');
+
+INSERT INTO `poke-tipo` VALUES (3,12);
+INSERT INTO `poke-tipo` VALUES (3,4);
+INSERT INTO `poke-tipo` VALUES (6,10);
+INSERT INTO `poke-tipo` VALUES (6,3);
+INSERT INTO `poke-tipo` VALUES (9,11);
+
+INSERT INTO `egggroup` VALUES (1, 'Monstruo');
+INSERT INTO `egggroup` VALUES (2, 'Agua 1');
+INSERT INTO `egggroup` VALUES (3, 'Bicho');
+INSERT INTO `egggroup` VALUES (4, 'Volador');
+INSERT INTO `egggroup` VALUES (5, 'Campo');
+INSERT INTO `egggroup` VALUES (6, 'Hada');
+INSERT INTO `egggroup` VALUES (7, 'Planta');
+INSERT INTO `egggroup` VALUES (8, 'Casi Humano');
+INSERT INTO `egggroup` VALUES (9, 'Agua 3');
+INSERT INTO `egggroup` VALUES (10, 'Mineral');
+INSERT INTO `egggroup` VALUES (11, 'Amorfo');
+INSERT INTO `egggroup` VALUES (12, 'Agua 2');
+INSERT INTO `egggroup` VALUES (13, 'Ditto');
+INSERT INTO `egggroup` VALUES (14, 'Dragon');
+INSERT INTO `egggroup` VALUES (15, 'Desconocido');
+INSERT INTO `egggroup` VALUES (16, 'Sin genero');
+
+INSERT INTO `habilidad` VALUES (65, 'Espesura', 'Amplifica los ataques de tipo Planta cuando los PS son bajos');
+INSERT INTO `habilidad` VALUES (66, 'Mar Llamas', 'Amplifica los ataques de tipo Fuego cuando los PS son bajos');
+INSERT INTO `habilidad` VALUES (67, 'Torrente', 'Amplifica los ataques de tipo Agua cuando los PS son bajos');
+INSERT INTO `habilidad` VALUES (14, 'Ojo Compuesto', 'Aumenta la precisión');
+INSERT INTO `habilidad` VALUES (68, 'Enjambre', 'Amplifica los ataques de tipo Bicho cuando los PS son bajos');
+INSERT INTO `habilidad` VALUES (51, 'Vista Lince', 'La precisión no puede ser reducida por un oponente');
+INSERT INTO `habilidad` VALUES (77, 'Tumbos', 'Aumenta la velocidad cuando está confundido');
+INSERT INTO `habilidad` VALUES (9, 'Electricidad Estática', 'Puede paralizar a un oponente que haga contacto');
+INSERT INTO `habilidad` VALUES (8, 'Velo Arena', 'Aumenta la evasión en una tormenta de arena');
+INSERT INTO `habilidad` VALUES (56, 'Gran Encanto', 'Puede causar enamoramiento al hacer contacto');
+INSERT INTO `habilidad` VALUES (98, 'Muro Mágico', 'Proporciona protección total contra daño indirecto');
+INSERT INTO `habilidad` VALUES (11, 'Absorbe Agua', 'Los ataques de tipo Agua curan al Pokémon');
+INSERT INTO `habilidad` VALUES (6, 'Humedad', 'Evita el uso de ataques de autodestrucción por cualquier Pokémon en el campo');
+INSERT INTO `habilidad` VALUES (26, 'Levitación', 'Proporciona inmunidad a los movimientos de tipo Tierra');
+INSERT INTO `habilidad` VALUES (12, 'Despiste', 'Evita el enamoramiento');
+INSERT INTO `habilidad` VALUES (108, 'Alerta', 'Muestra el movimiento más poderoso del oponente');
+INSERT INTO `habilidad` VALUES (33, 'Nado Rápido', 'Duplica la velocidad bajo condiciones de lluvia');
+INSERT INTO `habilidad` VALUES (75, 'Caparazón', 'Proporciona protección contra golpes críticos');
+INSERT INTO `habilidad` VALUES (29, 'Cuerpo Puro', 'Las estadísticas no pueden ser reducidas por un oponente');
+INSERT INTO `habilidad` VALUES (34, 'Clorofila', 'Duplica la velocidad bajo luz solar intensa');
+INSERT INTO `habilidad` VALUES (94, 'Poder Solar', 'Bajo luz solar intensa, el Ataque Especial se incrementa y se pierde 1/8 de PS cada turno');
+INSERT INTO `habilidad` VALUES (44, 'Cura Lluvia', 'Recupera PS gradualmente en lluvia');
+INSERT INTO `habilidad` VALUES (110, 'Lente Compuesta', 'Aumenta el poder de movimientos poco efectivos');
+INSERT INTO `habilidad` VALUES (92, 'Francotirador', 'Aumenta el poder de los golpes críticos');
+INSERT INTO `habilidad` VALUES (145, 'Sacapecho', 'La defensa no puede ser reducida por un oponente');
+INSERT INTO `habilidad` VALUES (31, 'Pararrayos', 'Redirige los ataques de tipo Eléctrico hacia este Pokémon, los anula y aumenta el Ataque Especial');
+INSERT INTO `habilidad` VALUES (146, 'Ímpetu Arena', 'Duplica la velocidad en una tormenta de arena');
+INSERT INTO `habilidad` VALUES (132, 'Guardia Amistad', 'Disminuye el daño infligido contra Pokémon aliados');
+INSERT INTO `habilidad` VALUES (87, 'Piel Seca', 'Recupera PS en lluvia, pierde PS bajo luz solar intensa');
+INSERT INTO `habilidad` VALUES (133, 'Armadura Frágil', 'Aumenta la velocidad y reduce la defensa al ser golpeado');
+INSERT INTO `habilidad` VALUES (135, 'Metal Liviano', 'Reduce el peso a la mitad');
+
+INSERT INTO `poke-egg` VALUES (3,1);
+INSERT INTO `poke-egg` VALUES (3,7);
+INSERT INTO `poke-egg` VALUES (6,1);
+INSERT INTO `poke-egg` VALUES (6,14);
+INSERT INTO `poke-egg` VALUES (9,1);
+INSERT INTO `poke-egg` VALUES (9,2);
+INSERT INTO `poke-egg` VALUES (12,3);
+INSERT INTO `poke-egg` VALUES (15,3);
+INSERT INTO `poke-egg` VALUES (18,4);
+INSERT INTO `poke-egg` VALUES (26,5);
+INSERT INTO `poke-egg` VALUES (26,6);
+INSERT INTO `poke-egg` VALUES (28,5);
+INSERT INTO `poke-egg` VALUES (36,6);
+INSERT INTO `poke-egg` VALUES (62,2);
+INSERT INTO `poke-egg` VALUES (94,11);
+INSERT INTO `poke-egg` VALUES (124,8);
+INSERT INTO `poke-egg` VALUES (139,2);
+INSERT INTO `poke-egg` VALUES (139,9);
+INSERT INTO `poke-egg` VALUES (376,16);
+INSERT INTO `poke-egg` VALUES (635,14);
+
+INSERT INTO `poke-habilidad` VALUES (3,65,'1');
+INSERT INTO `poke-habilidad` VALUES (3,34,'3');
+INSERT INTO `poke-habilidad` VALUES (6,66,'1');
+INSERT INTO `poke-habilidad` VALUES (6,94,'3');
+INSERT INTO `poke-habilidad` VALUES (9,67,'1');
+INSERT INTO `poke-habilidad` VALUES (9,44,'3');
+INSERT INTO `poke-habilidad` VALUES (12,14,'1');
+INSERT INTO `poke-habilidad` VALUES (12,110,'3');
+INSERT INTO `poke-habilidad` VALUES (15,68,'1');
+INSERT INTO `poke-habilidad` VALUES (15,97,'3');
+INSERT INTO `poke-habilidad` VALUES (18,51,'1');
+INSERT INTO `poke-habilidad` VALUES (18,77,'2');
+INSERT INTO `poke-habilidad` VALUES (18,145,'3');
+INSERT INTO `poke-habilidad` VALUES (26,9,'1');
+INSERT INTO `poke-habilidad` VALUES (26,31,'3');
+INSERT INTO `poke-habilidad` VALUES (28,8,'1');
+INSERT INTO `poke-habilidad` VALUES (28,146,'3');
+INSERT INTO `poke-habilidad` VALUES (36,56,'1');
+INSERT INTO `poke-habilidad` VALUES (36,98,'2');
+INSERT INTO `poke-habilidad` VALUES (36,132,'3');
+INSERT INTO `poke-habilidad` VALUES (62,11,'1');
+INSERT INTO `poke-habilidad` VALUES (62,6,'2');
+INSERT INTO `poke-habilidad` VALUES (62,33,'3');
+INSERT INTO `poke-habilidad` VALUES (94,26,'1');
+INSERT INTO `poke-habilidad` VALUES (124,12,'1');
+INSERT INTO `poke-habilidad` VALUES (124,108,'2');
+INSERT INTO `poke-habilidad` VALUES (124,87,'3');
+INSERT INTO `poke-habilidad` VALUES (139,33,'1');
+INSERT INTO `poke-habilidad` VALUES (139,75,'2');
+INSERT INTO `poke-habilidad` VALUES (139,133,'3');
+INSERT INTO `poke-habilidad` VALUES (376,29,'1');
+INSERT INTO `poke-habilidad` VALUES (376,135,'3');
+INSERT INTO `poke-habilidad` VALUES (635,26,'1');
+
+INSERT INTO `categoria` VALUES (1, 'Physical');
+INSERT INTO `categoria` VALUES (2, 'Special');
+INSERT INTO `categoria` VALUES (3, 'Status');
+
+INSERT INTO `movimientos` VALUES (56, 'Bomba Hidro', 11, 2, 110, 80, 5, 'Ninguno');
+INSERT INTO `movimientos` VALUES (350, 'Pedrada', 6, 1, 25, 90, 10, 'Golpea 2-5 veces');
+INSERT INTO `movimientos` VALUES (131, 'Clavo Cañón', 1, 1, 20, 100, 15, 'Golpea 2-5 veces');
+INSERT INTO `movimientos` VALUES (246, 'Poder Pasado', 6, 2, 60, 200, 5, 'Puede aumentar todas las estadísticas');
+INSERT INTO `movimientos` VALUES (362, 'Salmuera', 11, 2, 65, 100, 15, 'Doble daño contra oponente cuyos PS estén por debajo de 1/2');
+INSERT INTO `movimientos` VALUES (341, 'Disparo Lodo', 5, 2, 55, 95, 15, 'Reduce la velocidad del objetivo');
+INSERT INTO `movimientos` VALUES (205, 'Rodar', 6, 1, 30, 90, 20, 'Ataca durante cinco turnos, duplicando el daño a menos que sea interrumpido');
+INSERT INTO `movimientos` VALUES (55, 'Pistola Agua', 11, 2, 40, 100, 25, 'Ninguno');
+INSERT INTO `movimientos` VALUES (44, 'Mordisco', 17, 1, 60, 100, 25, 'Puede hacer que el objetivo retroceda');
+
+INSERT INTO `Aprendizajes` VALUES (139, 56, 75);
+INSERT INTO `Aprendizajes` VALUES (139, 350, 56);
+INSERT INTO `Aprendizajes` VALUES (139, 131, 40);
+INSERT INTO `Aprendizajes` VALUES (139, 246, 37);
+INSERT INTO `Aprendizajes` VALUES (139, 362, 28);
+INSERT INTO `Aprendizajes` VALUES (139, 341, 25);
+INSERT INTO `Aprendizajes` VALUES (139, 205, 16);
+INSERT INTO `Aprendizajes` VALUES (139, 55, 10);
+INSERT INTO `Aprendizajes` VALUES (139, 44, 7);
+INSERT INTO `Aprendizajes` VALUES (9, 56, 60);
+INSERT INTO `Aprendizajes` VALUES (9, 44, 16);
+INSERT INTO `Aprendizajes` VALUES (9, 55, 7);
+
+
+INSERT INTO videojuegos (NombreJuego)
+VALUES
+    ('Red'),
+    ('Blue'),
+    ('Yellow'),
+    ('Gold'),
+    ('Silver'),
+    ('Crystal'),
+    ('Ruby'),
+    ('Sapphire'),
+    ('Emerald'),
+    ('Diamond'),
+    ('Pearl'),
+    ('Platinum'),
+    ('Black'),
+    ('White'),
+    ('Black 2'),
+    ('White 2'),
+    ('X'),
+    ('Y'),
+    ('Omega Ruby'),
+    ('Alpha Sapphire'),
+    ('Sun'),
+    ('Moon'),
+    ('Ultra Sun'),
+    ('Ultra Moon'),
+    ('Sword'),
+    ('Shield');
+
+
+INSERT INTO poke_videojuegos (IDpoke, IDJuego)
+VALUES
+    (1, 1),  
+    (1, 2),  
+    (2, 1),  
+    (2, 2),  
+    (3, 1),  
+    (3, 3),  
+    (4, 4),  
+    (4, 5),  
+    (5, 4),  
+    (5, 5),  
+    (6, 6),  
+    (7, 7), 
+    (7, 8),  
+    (8, 7),  
+    (8, 8),  
+    (9, 9),  
+    (10, 10),
+    (10, 11),
+    (11, 10),
+    (11, 11),
+    (12, 12),
+    (13, 13),
+    (13, 14),
+    (14, 13),
+    (14, 14);
+
+
 
 SET SQL_MODE=@OLD_SQL_MODE;
 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS;
